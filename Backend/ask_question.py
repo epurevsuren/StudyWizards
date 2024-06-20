@@ -16,6 +16,6 @@ def ask_question(question, file_name):
         print("Failed:", response.status_code, response.text)
 
 if __name__ == "__main__":
-    question = "What is this document about?"
+    question = "Talk about micro economics?"
     file_name = "BusinessStatistics.pdf"
     ask_question(question, file_name)

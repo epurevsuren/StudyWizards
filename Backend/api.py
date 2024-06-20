@@ -115,6 +115,7 @@ def ask_question():
     
     question = data['question']
     file_name = data['file_name']
+    print(file_name)
     collection_name = f"collection_{file_name.replace('.pdf', '')}"
     
     if not file_exists_in_db(collection_name):
