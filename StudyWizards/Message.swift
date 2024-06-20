@@ -10,6 +10,7 @@ import Foundation
 
 struct Message: Identifiable {
     let id = UUID()
+    let sender: String
     let text: String
     let date: Date
     let attachment: Attachment?

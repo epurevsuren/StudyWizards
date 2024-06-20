@@ -42,14 +42,40 @@ struct ChatView: View {
             AttachmentPicker(selectedAttachment: $selectedAttachment)
         }
     }
+    
+    func generateAutomaticResponse(for message: Message) -> Message? {
+        let lowercasedText = message.text.lowercased()
+        var responseText: String?
+
+        if lowercasedText.contains("hello") {
+            responseText = "Hi there! How can I help you today?"
+        } else if lowercasedText.contains("help") {
+            responseText = "Sure, what do you need help with?"
+        } else if lowercasedText.contains("thank you") {
+            responseText = "You're welcome!"
+        }
+
+        if let responseText = responseText {
+            return Message(sender: "Bot", text: responseText, date: Date(), attachment: nil)
+        }
+        return nil
+    }
 
     private func sendMessage() {
         guard !newMessageText.isEmpty || selectedAttachment != nil else { return }
-        let message = Message(text: newMessageText, date: Date(), attachment: selectedAttachment)
-        messages.append(message)
+        
+        let userMessage = Message(sender: "User", text: newMessageText, date: Date(), attachment: selectedAttachment)
+        messages.append(userMessage)
         newMessageText = ""
         selectedAttachment = nil
+
+        if let autoResponse = generateAutomaticResponse(for: userMessage) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { // Simulate response delay
+                messages.append(autoResponse)
+            }
+        }
     }
+
 }
 
 struct MessageView: View {
