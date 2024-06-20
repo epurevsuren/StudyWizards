@@ -2,3 +2,4 @@
 *.xcuserdatad/
 SamplePDF/
 /Backend/.env
+/Backend/.venv/
