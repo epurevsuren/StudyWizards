@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+import streamlit as st
 import os
 from dotenv import load_dotenv
 from langchain.chains.question_answering import load_qa_chain
@@ -6,8 +6,6 @@ from langchain_community.vectorstores import Chroma
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-app = Flask(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -83,42 +81,62 @@ def process_existing_pdfs():
             file_path = os.path.join(pdf_folder, file_name)
             insert_data(file_path)
 
-@app.route('/upload_pdf', methods=['POST'])
-def upload_pdf():
-    """Uploads a new PDF file and processes it into embeddings"""
-    if 'file' not in request.files:
-        return jsonify({"error": "No file part"}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
-    if file and file.filename.endswith('.pdf'):
-        file_path = f"./pdf_documents/{file.filename}"
+def main():
+    st.title("PDF Question Answering System")
+
+    # Process existing PDFs when the app starts
+    with st.spinner('Processing existing PDF files...'):
+        process_existing_pdfs()
+
+    st.markdown("### Upload New PDF File")
+    new_uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
+    if new_uploaded_file:
+        file_path = f"./pdf_documents/{new_uploaded_file.name}"
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        file.save(file_path)
-        insert_data(file_path)
-        return jsonify({"status": "File processed and inserted into vector database successfully"}), 200
-    else:
-        return jsonify({"error": "Invalid file type, only PDFs are allowed"}), 400
+        with open(file_path, "wb") as f:
+            f.write(new_uploaded_file.getbuffer())
+        with st.spinner('Processing new PDF file...'):
+            insert_data(file_path)
+        st.success("New file processed and inserted into vector database successfully")
+        st.experimental_rerun()
 
-@app.route('/ask_question', methods=['POST'])
-def ask_question():
-    """Fetches an answer to a question based on the selected PDF"""
-    data = request.get_json()
-    if not data or 'question' not in data or 'file_name' not in data:
-        return jsonify({"error": "Invalid request"}), 400
+    uploaded_files = os.listdir("./pdf_documents")
+    selected_file = st.selectbox("Select a PDF file", uploaded_files)
+
+    if selected_file:
+        collection_name = f"collection_{selected_file.replace('.pdf', '')}"
+        
+        if "previous_selected_file" not in st.session_state:
+            st.session_state.previous_selected_file = None
+        
+        # Reset conversation if a new file is selected
+        if st.session_state.previous_selected_file != selected_file:
+            st.session_state.conversation_history = ""
+            st.session_state.previous_selected_file = selected_file
+
+        if "conversation_history" not in st.session_state:
+            st.session_state.conversation_history = ""
+
+        initial_query = st.text_input("Enter your question:")
+        
+        if st.button("Ask Question"):
+            if initial_query:
+                context = st.session_state.conversation_history + " " + initial_query
+                with st.spinner('Fetching answer...'):
+                    answer = fetch_answer_from_llm(context, collection_name)
+                st.session_state.conversation_history += f" {initial_query} {answer}"
+                st.markdown(f"**Question:** {initial_query}")
+                st.markdown(f"**Answer:** {answer}")
+            else:
+                st.warning("Please enter a question.")
     
-    question = data['question']
-    file_name = data['file_name']
-    collection_name = f"collection_{file_name.replace('.pdf', '')}"
-    
-    if not file_exists_in_db(collection_name):
-        return jsonify({"error": "File not found in the database"}), 404
+        if st.button("Reset"):
+            st.session_state.conversation_history = ""
+            st.experimental_rerun()
 
-    answer = fetch_answer_from_llm(question, collection_name)
-    return jsonify({"question": question, "answer": answer}), 200
+    if "conversation_history" in st.session_state and st.session_state.conversation_history:
+        st.markdown("**Conversation History:**")
+        st.markdown(st.session_state.conversation_history)
 
-if __name__ == '__main__':
-    # Automatically process existing PDFs when the server starts
-    print("Processing existing PDF files...")
-    process_existing_pdfs()
-    app.run(debug=True)
+if __name__ == "__main__":
+    main()
