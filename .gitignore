@@ -3,3 +3,4 @@
 SamplePDF/
 /Backend/.env
 /Backend/.venv/
+/Backend/chroma_db/
