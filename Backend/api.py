@@ -74,6 +74,12 @@ def insert_data(file_path):
     except Exception as exception_message:
         print(str(exception_message))
 
+def delete_data(collection_name):
+    """Deletes embeddings for a document from Chroma DB and removes the file"""
+    embeddings = OpenAIEmbeddings()
+    vector_db = Chroma(collection_name=collection_name, persist_directory=CHROMA_DB_DIR, embedding_function=embeddings)
+    vector_db.delete_collection()
+
 def process_existing_pdfs():
     """Processes all existing PDFs in the folder into embeddings"""
     pdf_folder = "./pdf_documents"
@@ -117,8 +123,30 @@ def ask_question():
     answer = fetch_answer_from_llm(question, collection_name)
     return jsonify({"question": question, "answer": answer}), 200
 
+@app.route('/delete_file', methods=['DELETE'])
+def delete_file():
+    """Deletes a file and its embeddings from the database"""
+    data = request.get_json()
+    if not data or 'file_name' not in data:
+        return jsonify({"error": "Invalid request"}), 400
+
+    file_name = data['file_name']
+    collection_name = f"collection_{file_name.replace('.pdf', '')}"
+    file_path = f"./pdf_documents/{file_name}"
+    
+    if not file_exists_in_db(collection_name):
+        return jsonify({"error": "File not found in the database"}), 404
+
+    try:
+        delete_data(collection_name)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        return jsonify({"status": f"File '{file_name}' and its embeddings deleted successfully"}), 200
+    except Exception as exception_message:
+        return jsonify({"error": str(exception_message)}), 500
+
 if __name__ == '__main__':
     # Automatically process existing PDFs when the server starts
     print("Processing existing PDF files...")
     process_existing_pdfs()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
