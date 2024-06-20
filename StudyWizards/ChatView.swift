@@ -43,38 +43,39 @@ struct ChatView: View {
         }
     }
     
-    func generateAutomaticResponse(for message: Message) -> Message? {
-        let lowercasedText = message.text.lowercased()
-        var responseText: String?
+    private func fetchAutomaticResponse(for message: Message) {
+            guard let url = URL(string: "http://127.0.0.1:5000/ask_question") else { return }
 
-        if lowercasedText.contains("hello") {
-            responseText = "Hi there! How can I help you today?"
-        } else if lowercasedText.contains("help") {
-            responseText = "Sure, what do you need help with?"
-        } else if lowercasedText.contains("thank you") {
-            responseText = "You're welcome!"
-        }
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        if let responseText = responseText {
-            return Message(sender: "Bot", text: responseText, date: Date(), attachment: nil)
+            let body: [String: Any] = ["question": message.text, "file_name": "BusinessStatistics.pdf"]
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body, options: [])
+
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                guard let data = data, error == nil else { return }
+
+                if let responseDict = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+                   let responseText = responseDict["answer"] as? String {
+                    let botMessage = Message(sender: "Bot", text: responseText, date: Date(), attachment: nil)
+                    DispatchQueue.main.async {
+                        messages.append(botMessage)
+                    }
+                }
+            }.resume()
         }
-        return nil
-    }
 
     private func sendMessage() {
-        guard !newMessageText.isEmpty || selectedAttachment != nil else { return }
-        
-        let userMessage = Message(sender: "User", text: newMessageText, date: Date(), attachment: selectedAttachment)
-        messages.append(userMessage)
-        newMessageText = ""
-        selectedAttachment = nil
+            guard !newMessageText.isEmpty || selectedAttachment != nil else { return }
+            
+            let userMessage = Message(sender: "User", text: newMessageText, date: Date(), attachment: selectedAttachment)
+            messages.append(userMessage)
+            newMessageText = ""
+            selectedAttachment = nil
 
-        if let autoResponse = generateAutomaticResponse(for: userMessage) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { // Simulate response delay
-                messages.append(autoResponse)
-            }
+            fetchAutomaticResponse(for: userMessage)
         }
-    }
 
 }
 
