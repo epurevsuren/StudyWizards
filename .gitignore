@@ -1,4 +1,4 @@
 .DS_Store
 *.xcuserdatad/
-Backend/
 SamplePDF/
+/Backend/.env
